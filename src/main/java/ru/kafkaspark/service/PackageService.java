@@ -1,35 +1,38 @@
-package ru.kafkaspark.app;
+package ru.kafkaspark.service;
 
 import org.pcap4j.core.*;
 import org.pcap4j.core.PcapNetworkInterface.PromiscuousMode;
 import org.pcap4j.packet.Packet;
-import org.pcap4j.util.NifSelector;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-@Component
-public class PackageServer implements PacketListener, Runnable{
+@Service
+public class PackageService implements PacketListener, Runnable{
     private static final Executor SERVER_EXECUTOR = Executors.newSingleThreadExecutor();
-    private static final int PORT = 8027;
+
+//    @Value("${spark.port}")
+    private static final Integer PORT = 8070;
     private static PcapNetworkInterface device;
     private static BlockingQueue<String> eventQueue = new ArrayBlockingQueue<>(100);
 
     public static void getNetworkDevice() {
         try {
-            device = new NifSelector().selectNetworkInterface();
-            if (device == null) {
-                System.out.println("No device chosen.");
+            List<PcapNetworkInterface> pcapNetworkInterfaceList = Pcaps.findAllDevs();
+            if (pcapNetworkInterfaceList.size() < 1) {
+                System.out.println("no available devices");
                 System.exit(1);
             }
-        } catch (IOException e) {
+            device = pcapNetworkInterfaceList.get(0);
+        } catch (PcapNativeException e) {
             e.printStackTrace();
         }
     }
@@ -56,7 +59,7 @@ public class PackageServer implements PacketListener, Runnable{
         // Tell the handle to loop using the listener we created
         try {
             int maxPackets = -1;
-            handle.loop(maxPackets, new PackageServer());
+            handle.loop(maxPackets, new PackageService());
         } catch (InterruptedException | PcapNativeException | NotOpenException e) {
             e.printStackTrace();
         }

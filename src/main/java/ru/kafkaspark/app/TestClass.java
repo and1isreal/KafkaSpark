@@ -8,49 +8,60 @@ import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.*;
-import org.pcap4j.core.NotOpenException;
-import org.pcap4j.core.PcapNativeException;
-import org.pcap4j.packet.Packet;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import ru.kafkaspark.model.Limit;
-import ru.kafkaspark.repository.LimitRepository;
+import ru.kafkaspark.service.LimitService;
+import ru.kafkaspark.service.PackageService;
+import ru.kafkaspark.service.UpdateLimitsService;
+//import ru.kafkaspark.listener.KafkaConsumer;
+//import ru.kafkaspark.service.UpdateLimitsService;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class TestClass implements CommandLineRunner, Serializable {
 
-//    @Autowired
-//    private PcapApp pcapApp;
-//
     @Autowired
-    private LimitRepository limitRepository;
-//
-//    @Autowired
-//    private KafkaProducerConfiguration producer;
+    private transient KafkaTemplate<String, String> kafkaTemplate;
 
+    @Autowired
+    private transient LimitService limitService;
+
+    @Autowired
+    private transient KafkaTemplate<String, Limit> limitKafkaTemplate;
+
+    @Autowired
+    private transient PackageService packageServer;
+
+    @Autowired
+    private transient UpdateLimitsService updateLimitsService;
 
     private static final String HOST = "localhost";
+    private static final Integer PORT = 8070;
+    private static int num;
+    private static final String TOPIC = "alerts";
 
-    private static final int PORT = 8027;
+    public TestClass() {
+    }
 
-    private static int[] array = new int[1];
+    public void startThreads() {
+        new Thread(packageServer).start();
+        new Thread(updateLimitsService).start();
+    }
 
-    @Override
-    public void run(String... args) throws Exception {
-
-        new Thread(new PackageServer()).start();
-        Thread.sleep(5000);
-
+    public void startSpark() throws InterruptedException {
         SparkConf conf = new SparkConf()
                 .setMaster("local[*]")
                 .setAppName("VerySimpleStreamingApp");
         JavaStreamingContext streamingContext =
-                new JavaStreamingContext(conf, Durations.seconds(5));
+                new JavaStreamingContext(conf, Durations.seconds(10));
         Logger.getRootLogger().setLevel(Level.ERROR);
 
         // Receive streaming data from the source
@@ -72,10 +83,13 @@ public class TestClass implements CommandLineRunner, Serializable {
             @Override
             public void call(JavaRDD<Integer> integerJavaRDD) throws Exception {
                 if (integerJavaRDD != null) {
-                    System.out.println("inside IF");
-                    array[0] = integerJavaRDD.collect().get(0);
-                    System.out.println("array[0] = " + Arrays.toString(array));
-                    checkLimits();
+                    List<Integer> collection = integerJavaRDD.collect();
+                    if (collection.size() > 0) {
+                        System.out.println("SIZE = " + collection.size());
+                        num = collection.get(0);
+                        System.out.println("NUM = " + num);
+                        checkLimits();
+                    }
                 }
             }
         });
@@ -84,18 +98,31 @@ public class TestClass implements CommandLineRunner, Serializable {
         streamingContext.awaitTermination();
     }
 
-    public void checkLimits() {
-        Limit min = limitRepository.findLimitByName("min");
-        Limit max = limitRepository.findLimitByName("max");
+    @Override
+    public void run(String... args) throws Exception {
+        startThreads();
+        startSpark();
+    }
 
-        if (array[0] < min.getValue()) {
-            System.out.println("INSIDE checkLimits() IF");
-            min.setValue(array[0]);
-            limitRepository.save(min);
-        } else if (array[0] > max.getValue()) {
-            System.out.println("INSIDE checkLimits() ELSE");
-            min.setValue(array[0]);
-            limitRepository.save(max);
+    private void checkLimits() {
+        Optional<Limit> minLimit = limitService.getLimitByName("min");
+        Optional<Limit> maxLimit = limitService.getLimitByName("max");
+        Limit newLimit;
+
+        if (minLimit.isPresent() && maxLimit.isPresent() && (num < minLimit.get().getValue() || num > maxLimit.get().getValue()) ) {
+            newLimit = new Limit();
+            newLimit.setTime(new Date());
+            if (num < minLimit.get().getValue()) {
+                newLimit.setId(1);
+                newLimit.setName(minLimit.get().getName());
+                newLimit.setValue(num);
+            }
+            if (num > maxLimit.get().getValue()) {
+                newLimit.setId(2);
+                newLimit.setName(maxLimit.get().getName());
+                newLimit.setValue(num);
+            }
+            limitKafkaTemplate.send(TOPIC, newLimit);
         }
     }
 }
