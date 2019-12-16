@@ -16,22 +16,22 @@ import java.util.Map;
 @Configuration
 public class KafkaProducerConfiguration {
 
-//    @Bean
-//    public ProducerFactory<String, Limit> userProducerFactory() {
-//
-//        Map<String, Object> config = new HashMap<>();
-//
-//        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:9092");
-//        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-//        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-//
-//        return new DefaultKafkaProducerFactory<>(config);
-//    }
-//
-//    @Bean
-//    public KafkaTemplate<String, Limit> userKafkaTemplate() {
-//        return new KafkaTemplate<>(userProducerFactory());
-//    }
+    @Bean
+    public ProducerFactory<String, Limit> limitProducerFactory() {
+
+        Map<String, Object> config = new HashMap<>();
+
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:9092");
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    @Bean
+    public KafkaTemplate<String, Limit> limitKafkaTemplate() {
+        return new KafkaTemplate<>(limitProducerFactory());
+    }
 
     @Bean
     public ProducerFactory<String, String> producerFactory() {
@@ -49,5 +49,6 @@ public class KafkaProducerConfiguration {
     public KafkaTemplate<String, String> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
+
 
 }
