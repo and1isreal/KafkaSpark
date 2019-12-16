@@ -7,5 +7,4 @@ import java.util.Optional;
 
 public interface LimitRepository extends JpaRepository<Limit, Integer> {
     Optional<Limit> findLimitByName(String name);
-//    void updateLimit(Limit limit);
 }

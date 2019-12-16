@@ -5,7 +5,6 @@ import ru.kafkaspark.model.Limit;
 import java.util.Optional;
 
 public interface LimitService {
-//    Optional<Limit> getLimitById(int id);
     Optional<Limit> getLimitByName(String name);
     void updateLimit(Limit limit);
 }

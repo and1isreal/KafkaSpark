@@ -14,11 +14,6 @@ public class LimitServiceImpl implements LimitService {
     @Autowired
     private LimitRepository limitRepository;
 
-//    @Override
-//    public Optional<Limit> getLimitById(int id) {
-//        return limitRepository.findById(id);
-//    }
-
     @Override
     public Optional<Limit> getLimitByName(String name) {
         return limitRepository.findLimitByName(name);
@@ -26,7 +21,6 @@ public class LimitServiceImpl implements LimitService {
 
     @Override
     public void updateLimit(Limit limit) {
-        System.out.println("UPDATE LIMIT IN DATABASE");
         limitRepository.save(limit);
     }
 }

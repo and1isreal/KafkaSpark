@@ -2,29 +2,28 @@ package ru.kafkaspark.listener;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import ru.kafkaspark.model.Limit;
-import java.util.LinkedList;
+import java.util.Stack;
 
 
 @Service
 public class KafkaConsumer{
 
-    private static LinkedList<Limit> minLimits = new LinkedList<>();
-    private static LinkedList<Limit> maxLimits = new LinkedList<>();
+    private static Stack<Limit> minLimits = new Stack<>();
+    private static  Stack<Limit> maxLimits = new Stack<>();
 
     @KafkaListener(topics = "alerts", groupId = "group_json", containerFactory = "limitConcurrentKafkaListenerContainerFactory")
     public void consumeJson(Limit limit) {
-        System.out.println("consumed JSON msg -> " + limit);
         if (limit.getName().equals("min"))
-            minLimits.add(limit);
+            minLimits.push(limit);
         else if (limit.getName().equals("max"))
-            maxLimits.add(limit);
+            maxLimits.push(limit);
     }
 
-    public static LinkedList<Limit> getMinLimits() {
+    public static Stack<Limit> getMinLimits() {
         return minLimits;
     }
 
-    public static LinkedList<Limit> getMaxLimits() {
+    public static Stack<Limit> getMaxLimits() {
         return maxLimits;
     }
 }

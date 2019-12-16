@@ -4,8 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.kafkaspark.listener.KafkaConsumer;
 import ru.kafkaspark.model.Limit;
-
-import java.util.List;
+import java.util.Stack;
 
 @Service
 public class UpdateLimitsService implements Runnable {
@@ -17,7 +16,7 @@ public class UpdateLimitsService implements Runnable {
     public void run() {
         while (true) {
             try {
-                Thread.sleep(30000);
+                Thread.sleep(1000 * 60 * 20);
                 updateLimits();
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -25,16 +24,14 @@ public class UpdateLimitsService implements Runnable {
         }
     }
 
-    private void updateLimits() {
-        List<Limit> maxLimits = KafkaConsumer.getMaxLimits();
-        List<Limit> minLimits = KafkaConsumer.getMinLimits();
+    public void updateLimits() {
+        Stack<Limit> maxLimits = KafkaConsumer.getMaxLimits();
+        Stack<Limit> minLimits = KafkaConsumer.getMinLimits();
         if (maxLimits.size() > 0) {
-            System.out.println("UPDATING MAX");
-            limitService.updateLimit(KafkaConsumer.getMaxLimits().getLast());
+            limitService.updateLimit(KafkaConsumer.getMaxLimits().pop());
         }
         if (minLimits.size() > 0) {
-            System.out.println("UPDATING MIN");
-            limitService.updateLimit(KafkaConsumer.getMinLimits().getLast());
+            limitService.updateLimit(KafkaConsumer.getMinLimits().pop());
         }
     }
 }

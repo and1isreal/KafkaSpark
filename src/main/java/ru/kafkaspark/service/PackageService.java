@@ -2,9 +2,11 @@ package ru.kafkaspark.service;
 
 import org.pcap4j.core.*;
 import org.pcap4j.core.PcapNetworkInterface.PromiscuousMode;
+import org.pcap4j.packet.IpPacket;
 import org.pcap4j.packet.Packet;
 import org.springframework.stereotype.Service;
-
+import ru.kafkaspark.app.AppRunner;
+import ru.kafkaspark.util.Utils;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
@@ -17,16 +19,25 @@ import java.util.concurrent.Executors;
 
 @Service
 public class PackageService implements PacketListener, Runnable{
+
     private static final Executor SERVER_EXECUTOR = Executors.newSingleThreadExecutor();
-
-//    @Value("${spark.port}")
-    private static final Integer PORT = 8070;
-    private static PcapNetworkInterface device;
+    private static final Integer PORT = 8015;
+    private PcapNetworkInterface device;
     private static BlockingQueue<String> eventQueue = new ArrayBlockingQueue<>(100);
+    private List<PcapNetworkInterface> pcapNetworkInterfaceList;
 
-    public static void getNetworkDevice() {
+    public List<PcapNetworkInterface> getPcapNetworkInterfaceList() {
+        return pcapNetworkInterfaceList;
+    }
+
+
+    public PcapNetworkInterface getDevice() {
+        return device;
+    }
+
+    public void getNetworkDevice() {
         try {
-            List<PcapNetworkInterface> pcapNetworkInterfaceList = Pcaps.findAllDevs();
+            pcapNetworkInterfaceList = Pcaps.findAllDevs();
             if (pcapNetworkInterfaceList.size() < 1) {
                 System.out.println("no available devices");
                 System.exit(1);
@@ -39,14 +50,38 @@ public class PackageService implements PacketListener, Runnable{
 
     @Override
     public void gotPacket(Packet packet) {
-        try {
-            eventQueue.put(String.valueOf(packet.length()));
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        checkPacket(packet);
+    }
+
+    private void checkPacket(Packet packet) {
+        String srcIp;
+        IpPacket ipPacket;
+        if (AppRunner.getIpArg().isEmpty()) {
+            try {
+                eventQueue.put(String.valueOf(packet.length()));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } else {
+
+            if (!packet.contains(IpPacket.class)) {
+                return;
+            }
+
+            ipPacket = packet.get(IpPacket.class);
+            srcIp = Utils.getIpFromString(ipPacket.getHeader().getSrcAddr().getHostAddress());
+            System.out.println(srcIp);
+            if (!srcIp.equals(AppRunner.getIpArg())) {
+                try {
+                    eventQueue.put(String.valueOf(packet.length()));
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
-    public static void openDevice()  {
+    public void openDevice()  {
         int snapshotLength = 65536; // in bytes
         int readTimeout = 50; // in milliseconds
         PcapHandle handle = null;
@@ -56,7 +91,6 @@ public class PackageService implements PacketListener, Runnable{
             e.printStackTrace();
         }
 
-        // Tell the handle to loop using the listener we created
         try {
             int maxPackets = -1;
             handle.loop(maxPackets, new PackageService());
@@ -66,7 +100,7 @@ public class PackageService implements PacketListener, Runnable{
         handle.close();
     }
 
-    public static void startServer() throws IOException, InterruptedException {
+    public void startServer() throws IOException, InterruptedException {
         SERVER_EXECUTOR.execute(new SteamingServer());
         getNetworkDevice();
         openDevice();
@@ -90,7 +124,6 @@ public class PackageService implements PacketListener, Runnable{
             ) {
                 while (true) {
                     String event = eventQueue.take();
-//                    System.out.println(String.format("Writing \"%s\" to the socket.", event));
                     out.println(event);
                 }
             } catch (IOException|InterruptedException e) {
